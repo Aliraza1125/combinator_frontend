@@ -2,10 +2,12 @@ import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Upload, Image as ImageIcon, Loader2 } from 'lucide-react';
 import useAxios from '../hooks/useAxios';
+import axios from 'axios';
 
 export function ApplicationForm() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+  const bannerInputRef = useRef(null);
   const { isLoading, error, execute, clearError } = useAxios();
   
   const [formData, setFormData] = useState({
@@ -24,19 +26,77 @@ export function ApplicationForm() {
     fundingStage: '',
     fundingNeeded: 0,
     logo: '',
+    banner: ''
   });
 
   const [previewImage, setPreviewImage] = useState('');
+  const [previewBanner, setPreviewBanner] = useState('');
+  const [logoUploadLoading, setLogoUploadLoading] = useState(false);
+  const [bannerUploadLoading, setBannerUploadLoading] = useState(false);
+  const [logoUploadError, setLogoUploadError] = useState('');
+  const [bannerUploadError, setBannerUploadError] = useState('');
 
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewImage(reader.result);
-        setFormData(prev => ({ ...prev, logo: reader.result }));
-      };
-      reader.readAsDataURL(file);
+  const handleLogoUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setLogoUploadLoading(true);
+    setLogoUploadError('');
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "e-tourism");
+    formData.append("cloud_name", "de6y4p2ou");
+
+    try {
+      const response = await axios.post(
+        "https://api.cloudinary.com/v1_1/de6y4p2ou/image/upload",
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+      setFormData(prev => ({ ...prev, logo: response.data.secure_url }));
+      setPreviewImage(response.data.secure_url);
+    } catch (error) {
+      console.error('Upload error:', error.response?.data || error);
+      setLogoUploadError('Logo upload failed. Please try again.');
+    } finally {
+      setLogoUploadLoading(false);
+    }
+  };
+
+  const handleBannerUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setBannerUploadLoading(true);
+    setBannerUploadError('');
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "e-tourism");
+    formData.append("cloud_name", "de6y4p2ou");
+
+    try {
+      const response = await axios.post(
+        "https://api.cloudinary.com/v1_1/de6y4p2ou/image/upload",
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+      setFormData(prev => ({ ...prev, banner: response.data.secure_url }));
+      setPreviewBanner(response.data.secure_url);
+    } catch (error) {
+      console.error('Upload error:', error.response?.data || error);
+      setBannerUploadError('Banner upload failed. Please try again.');
+    } finally {
+      setBannerUploadLoading(false);
     }
   };
 
@@ -84,8 +144,12 @@ export function ApplicationForm() {
       fundingStage: '',
       fundingNeeded: 0,
       logo: '',
+      banner: ''
     });
     setPreviewImage('');
+    setPreviewBanner('');
+    setLogoUploadError('');
+    setBannerUploadError('');
     clearError();
   };
 
@@ -95,36 +159,36 @@ export function ApplicationForm() {
 
   return (
     <form onSubmit={handleSubmit} className="max-w-6xl mx-auto p-6 space-y-8">
-    {error && (
-      <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded">
-        <div className="flex">
-          <div className="flex-shrink-0">
-            <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-            </svg>
-          </div>
-          <div className="ml-3">
-            <p className="text-sm text-red-700">{error}</p>
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
 
       <div className="space-y-8">
         <div className={sectionClasses}>
           <h1 className="text-3xl font-bold text-gray-900 mb-6">Startup Application</h1>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="col-span-2 md:col-span-1">
+            <div>
               <label className={labelClasses}>
                 Company Logo
                 <div 
-                  className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg transition-colors ${!isLoading && 'hover:border-blue-400 cursor-pointer'} ${isLoading && 'opacity-50 cursor-not-allowed'}`}
-                  onClick={() => !isLoading && fileInputRef.current?.click()}
+                  className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg transition-colors ${!logoUploadLoading && 'hover:border-blue-400 cursor-pointer'} ${logoUploadLoading && 'opacity-50 cursor-not-allowed'}`}
+                  onClick={() => !logoUploadLoading && fileInputRef.current?.click()}
                 >
                   <div className="space-y-2 text-center">
                     {previewImage ? (
-                      <img src={previewImage} alt="Preview" className="mx-auto h-32 w-32 object-cover rounded-lg" />
+                      <img src={previewImage} alt="Logo Preview" className="mx-auto h-32 w-32 object-cover rounded-lg" />
                     ) : (
                       <div className="mx-auto h-32 w-32 flex items-center justify-center rounded-lg bg-gray-50">
                         <ImageIcon className="h-12 w-12 text-gray-400" />
@@ -132,16 +196,54 @@ export function ApplicationForm() {
                     )}
                     <div className="flex justify-center items-center text-sm text-gray-600">
                       <Upload className="w-5 h-5 mr-1" />
-                      <span>Upload logo</span>
+                      <span>{logoUploadLoading ? 'Uploading...' : 'Upload logo'}</span>
                       <input
                         ref={fileInputRef}
                         type="file"
                         className="sr-only"
                         accept="image/*"
-                        onChange={handleImageUpload}
-                        disabled={isLoading}
+                        onChange={handleLogoUpload}
+                        disabled={logoUploadLoading}
                       />
                     </div>
+                    {logoUploadError && (
+                      <p className="text-red-500 text-xs">{logoUploadError}</p>
+                    )}
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            <div>
+              <label className={labelClasses}>
+                Company Banner
+                <div 
+                  className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg transition-colors ${!bannerUploadLoading && 'hover:border-blue-400 cursor-pointer'} ${bannerUploadLoading && 'opacity-50 cursor-not-allowed'}`}
+                  onClick={() => !bannerUploadLoading && bannerInputRef.current?.click()}
+                >
+                  <div className="space-y-2 text-center">
+                    {previewBanner ? (
+                      <img src={previewBanner} alt="Banner Preview" className="mx-auto h-32 w-full object-cover rounded-lg" />
+                    ) : (
+                      <div className="mx-auto h-32 w-full flex items-center justify-center rounded-lg bg-gray-50">
+                        <ImageIcon className="h-12 w-12 text-gray-400" />
+                      </div>
+                    )}
+                    <div className="flex justify-center items-center text-sm text-gray-600">
+                      <Upload className="w-5 h-5 mr-1" />
+                      <span>{bannerUploadLoading ? 'Uploading...' : 'Upload banner'}</span>
+                      <input
+                        ref={bannerInputRef}
+                        type="file"
+                        className="sr-only"
+                        accept="image/*"
+                        onChange={handleBannerUpload}
+                        disabled={bannerUploadLoading}
+                      />
+                    </div>
+                    {bannerUploadError && (
+                      <p className="text-red-500 text-xs">{bannerUploadError}</p>
+                    )}
                   </div>
                 </div>
               </label>

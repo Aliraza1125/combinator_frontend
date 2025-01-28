@@ -13,10 +13,11 @@ interface Application {
   pitch: string;
   fundingStage: string;
   logo: string;
+  banner: string;
   status: string;
-  metrics: {
-    views: number;
-    users: number;
+  views?: {
+    total: number;
+    unique: number;
   };
 }
 
@@ -42,10 +43,16 @@ export function StartupListings() {
         url: '/api/applications'
       });
       
-      // Filter only approved applications
-      const approvedStartups = response.applications.filter(
-        (app: Application) => app.status === 'approved'
-      );
+      // Filter only approved applications and ensure they have required image fields
+      const approvedStartups = response.applications
+        .filter((app: Application) => app.status === 'approved')
+        .map((app: Application) => ({
+          ...app,
+          logo: app.logo || '/default-logo.png',
+          banner: app.banner || '/default-banner.png',
+          views: app.views || { total: 0, unique: 0 }
+        }));
+
       setStartups(approvedStartups);
       setFilteredStartups(approvedStartups);
     } catch (error) {
@@ -65,6 +72,11 @@ export function StartupListings() {
 
       return matchesSearch && matchesIndustry && matchesFundingStage && matchesLocation;
     });
+
+    // Sort by views (most viewed first) if no search filters are active
+    if (!filters.search && !filters.industry && !filters.fundingStage && !filters.location) {
+      filtered.sort((a, b) => (b.views?.total || 0) - (a.views?.total || 0));
+    }
 
     setFilteredStartups(filtered);
   }, [filters, startups]);
@@ -95,23 +107,15 @@ export function StartupListings() {
               Failed to load startups. Please try again later.
             </div>
           )}
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-  {filteredStartups.map((startup) => (
-    <StartupCard 
-      key={startup._id} 
-      startup={{
-        _id: startup._id,
-        companyName: startup.companyName,
-        industry: startup.industry,
-        location: startup.location,
-        teamSize: startup.teamSize,
-        pitch: startup.pitch,
-        fundingStage: startup.fundingStage,
-        logo: startup.logo
-      }} 
-    />
-  ))}
-</div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredStartups.map((startup) => (
+              <StartupCard 
+                key={startup._id} 
+                startup={startup}
+              />
+            ))}
+          </div>
           
           {filteredStartups.length === 0 && !isLoading && (
             <div className="text-center py-12">

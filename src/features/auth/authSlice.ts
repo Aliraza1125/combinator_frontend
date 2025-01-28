@@ -43,8 +43,9 @@ export const loginUser = createAsyncThunk(
   'auth/login',
   async (userData: AuthData, { rejectWithValue }) => {
     try {
+      // const response = await axios.post('https://combinator-backend.onrender.com/login', userData);
       const response = await axios.post('https://combinator-backend.onrender.com/login', userData);
-      
+
       // Store user data and token in localStorage
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('userData', JSON.stringify(response.data.user));

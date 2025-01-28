@@ -1,27 +1,85 @@
-import { useStartupStore } from "../store/startupStore";
+import React, { useState, useEffect } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { Loader2, Pencil, BarChart, Users, Eye } from 'lucide-react';
+import useAxios from '../hooks/useAxios';
 import { StartupProfileEditor } from "../components/StartupProfileEditor";
-import { StartupProfileView } from "../components/StartupProfileView";
-import { ViewCounter } from "../components/ViewCounter";
 import { BookmarkButton } from "../components/startup/BookmarkButton";
 import { ContactRequestDialog } from "../components/ContactRequestDialog";
 import { InvestorShowcase } from "../components/startup/investors/InvestorShowcase";
 import { StartupUpdates } from "../components/startup/updates/StartupUpdates";
 import { TeamSection } from "../components/startup/team/TeamSection";
-import { MetricsSection } from "../components/startup/metrics/MetricsSection";
 import { DocumentSection } from "../components/startup/documents/DocumentSection";
 import { Button } from "../components/ui/Button";
 import { FundraisingCard } from "../components/startup/fundraising/FundraisingCard";
-import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import useAxios from '../hooks/useAxios';
-import { Loader2, Pencil, BarChart } from 'lucide-react';
 
+interface Startup {
+  id: string;
+  userId: string; // Added to track ownership
+  companyName: string;
+  industry: string;
+  location: string;
+  teamSize: number;
+  pitch: string;
+  logo?: string;
+  banner?: string;
+  foundedDate: string;
+  fundingStage: string;
+  website?: string;
+  status: string;
+  views: {
+    total: number;
+    unique: number;
+  };
+  teamMembers: Array<{
+    id: string;
+    name: string;
+    role: string;
+    avatar?: string;
+  }>;
+  updates: Array<{
+    id: string;
+    date: string;
+    content: string;
+  }>;
+  investments: Array<{
+    id: string;
+    investor: string;
+    amount: number;
+    date: string;
+  }>;
+  socialLinks: Record<string, string>;
+  fundraising: {
+    goal: number;
+    raised: number;
+    backers: number;
+    endDate: string;
+    description: string;
+  } | null;
+  bookmarkedBy?: string[];
+  pitchDeckUrl?: string;
+  videoUrl?: string;
+}
+
+function getLoggedInUser() {
+  const userData = localStorage.getItem('userData');
+  return userData ? JSON.parse(userData) : null;
+}
 
 export function StartupProfile() {
   const { id } = useParams<{ id: string }>();
   const [isEditing, setIsEditing] = useState(false);
-  const [startup, setStartup] = useState<any>(null);
+  const [startup, setStartup] = useState<Startup | null>(null);
+  const [rawStartupData, setRawStartupData] = useState<any>(null); // Add this to store raw API data
+
   const { isLoading, error, execute } = useAxios();
+  const loggedInUser = getLoggedInUser();
+console.log("logged in user",loggedInUser)  
+console.log(startup)
+  // Check if the logged-in user is the owner of the startup or an admin
+  const isOwner = loggedInUser && startup?.userId._id === loggedInUser._id;
+  console.log("isowner",isOwner)
+  const isAdmin = loggedInUser?.isAdmin;
+  const canEdit = isOwner || isAdmin;
 
   useEffect(() => {
     fetchStartupDetails();
@@ -33,36 +91,63 @@ export function StartupProfile() {
         method: 'GET',
         url: `/api/applications/${id}`
       });
-      
-      // Transform backend data to match frontend structure
-      const transformedData = {
+      setRawStartupData(response.application);
+      const transformedData: Startup = {
         id: response.application._id,
+        userId: response.application.userId,
         companyName: response.application.companyName,
         industry: response.application.industry,
         location: response.application.location,
         teamSize: response.application.teamSize,
         pitch: response.application.pitch,
         logo: response.application.logo,
+        banner: response.application.banner,
         foundedDate: response.application.foundedDate,
         fundingStage: response.application.fundingStage,
         website: response.application.website,
         status: response.application.status,
-        metrics: {
-          views: 0,
-          users: 0
+        views: {
+          total: response.application.views?.total || 0,
+          unique: response.application.views?.uniqueUsers?.length || 0
         },
-        // Add default values for optional fields
-        teamMembers: [],
-        updates: [],
-        investments: [],
-        socialLinks: {},
-        fundraising: null
+        teamMembers: response.application.teamMembers || [],
+        updates: response.application.updates || [],
+        investments: response.application.investments || [],
+        socialLinks: response.application.socialLinks || {},
+        fundraising: response.application.fundraising || null,
+        bookmarkedBy: response.application.bookmarkedBy || [],
+        pitchDeckUrl: response.application.pitchDeckUrl,
+        videoUrl: response.application.videoUrl
       };
 
       setStartup(transformedData);
     } catch (error) {
       console.error('Failed to fetch startup details:', error);
     }
+  };
+
+  const handleSave = async (updatedData: any) => {
+    try {
+      await execute({
+        method: 'PUT',
+        url: `/api/applications/${id}`,
+        data: updatedData
+      });
+      await fetchStartupDetails();
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Failed to update startup:', error);
+    }
+  };
+
+  const formatNumber = (num: number) => {
+    if (num >= 1000000) {
+      return `${(num / 1000000).toFixed(1)}M`;
+    }
+    if (num >= 1000) {
+      return `${(num / 1000).toFixed(1)}K`;
+    }
+    return num.toString();
   };
 
   if (isLoading) {
@@ -85,27 +170,37 @@ export function StartupProfile() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div className="relative h-64 rounded-xl overflow-hidden mb-8">
-      <img
-        src="https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&q=80"
-        alt={startup.companyName}
-        className="w-full h-full object-cover"
-      />
-      <div className="absolute bottom-4 left-4 flex items-center space-x-4">
+      <div className="relative h-64 rounded-xl overflow-hidden mb-8">
         <img
-          src={startup.logo || 'https://via.placeholder.com/80'}
-          alt={`${startup.companyName} logo`}
-          className="w-20 h-20 rounded-lg bg-white p-2 shadow-lg"
+          src={startup.banner || "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&q=80"}
+          alt={startup.companyName}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement;
+            target.src = "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&q=80";
+          }}
         />
-        <div className="bg-white/90 backdrop-blur-sm rounded-lg p-3">
-          <h1 className="text-2xl font-bold text-gray-900">
-            {startup.companyName}
-          </h1>
-          <p className="text-gray-600">{startup.location}</p>
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/30" />
+        <div className="absolute bottom-4 left-4 flex items-center space-x-4">
+          <div className="w-20 h-20 rounded-lg bg-white p-2 shadow-lg overflow-hidden">
+            <img
+              src={startup.logo || 'https://via.placeholder.com/80'}
+              alt={`${startup.companyName} logo`}
+              className="w-full h-full object-contain"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.src = 'https://via.placeholder.com/80';
+              }}
+            />
+          </div>
+          <div className="bg-white/90 backdrop-blur-sm rounded-lg p-3">
+            <h1 className="text-2xl font-bold text-gray-900">
+              {startup.companyName}
+            </h1>
+            <p className="text-gray-600">{startup.location}</p>
+          </div>
         </div>
       </div>
-    </div>
-
 
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center space-x-4">
@@ -119,32 +214,47 @@ export function StartupProfile() {
             startupLogo={startup.logo}
             onRequestSent={() => {}}
           />
-          <ViewCounter views={startup.metrics.views} />
         </div>
         <div className="flex items-center space-x-4">
-          <Link
-            to={`/startups/${startup.id}/analytics`}
-            className="flex items-center space-x-2 text-indigo-600 hover:text-indigo-700"
-          >
-            <BarChart className="w-5 h-5" />
-            <span>View Analytics</span>
-          </Link>
-          <Button
-            onClick={() => setIsEditing(!isEditing)}
-            variant="outline"
-            className="flex items-center space-x-2"
-          >
-            <Pencil className="w-4 h-4" />
-            <span>{isEditing ? "View Profile" : "Edit Profile"}</span>
-          </Button>
+          {canEdit && (
+            <>
+              <Link
+                to={`/startups/${startup.id}/analytics`}
+                className="flex items-center space-x-2 text-indigo-600 hover:text-indigo-700"
+              >
+                <BarChart className="w-5 h-5" />
+                <span>View Analytics</span>
+              </Link>
+              <Button
+                onClick={() => setIsEditing(!isEditing)}
+                variant="outline"
+                className="flex items-center space-x-2"
+              >
+                <Pencil className="w-4 h-4" />
+                <span>{isEditing ? "View Profile" : "Edit Profile"}</span>
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
-      {isEditing ? (
-        <StartupProfileEditor
-          startup={startup}
+      {isEditing && canEdit ? (
+          <StartupProfileEditor
+          startup={rawStartupData} // Pass the raw data instead of transformed data
           onCancel={() => setIsEditing(false)}
-          onSave={() => setIsEditing(false)}
+          onSave={async (updatedData) => {
+            try {
+              await execute({
+                method: 'PUT',
+                url: `/api/applications/${id}`,
+                data: updatedData
+              });
+              await fetchStartupDetails();
+              setIsEditing(false);
+            } catch (error) {
+              console.error('Failed to update startup:', error);
+            }
+          }}
         />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -152,7 +262,36 @@ export function StartupProfile() {
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-xl font-semibold mb-4">About</h2>
               <p className="text-gray-600 mb-6">{startup.pitch}</p>
-              <MetricsSection metrics={startup.metrics} />
+              <div className="flex items-center space-x-8 border-t border-gray-200 pt-6">
+                <div className="flex items-center space-x-2">
+                  <Users className="w-5 h-5 text-gray-400" />
+                  <div>
+                    <p className="text-xl font-semibold text-gray-900">{formatNumber(startup.teamSize)}</p>
+                    <p className="text-sm text-gray-500">team members</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Users className="w-5 h-5 text-gray-400" />
+                  <div>
+                    <p className="text-xl font-semibold text-gray-900">{formatNumber(startup.teamSize * 100)}</p>
+                    <p className="text-sm text-gray-500">users</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Eye className="w-5 h-5 text-gray-400" />
+                  <div>
+                    <p className="text-xl font-semibold text-gray-900">{formatNumber(startup.views.total)}</p>
+                    <p className="text-sm text-gray-500">total views</p>
+                  </div>
+                </div>
+                {/* <div className="flex items-center space-x-2">
+                  <Eye className="w-5 h-5 text-gray-400" />
+                  <div>
+                    <p className="text-xl font-semibold text-gray-900">{formatNumber(startup.views.unique)}</p>
+                    <p className="text-sm text-gray-500">unique views</p>
+                  </div>
+                </div> */}
+              </div>
             </div>
 
             <div className="bg-white rounded-lg shadow-sm p-6">
@@ -161,9 +300,7 @@ export function StartupProfile() {
             </div>
 
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold mb-6">
-                Updates & Milestones
-              </h2>
+              <h2 className="text-xl font-semibold mb-6">Updates & Milestones</h2>
               <StartupUpdates updates={startup.updates} />
             </div>
 
@@ -186,9 +323,7 @@ export function StartupProfile() {
               <h2 className="text-xl font-semibold mb-4">Quick Facts</h2>
               <dl className="space-y-4">
                 <div>
-                  <dt className="text-sm font-medium text-gray-500">
-                    Industry
-                  </dt>
+                  <dt className="text-sm font-medium text-gray-500">Industry</dt>
                   <dd className="text-base text-gray-900 capitalize">
                     {startup.industry}
                   </dd>
@@ -200,9 +335,7 @@ export function StartupProfile() {
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-sm font-medium text-gray-500">
-                    Team Size
-                  </dt>
+                  <dt className="text-sm font-medium text-gray-500">Team Size</dt>
                   <dd className="text-base text-gray-900">
                     {startup.teamSize} members
                   </dd>
@@ -245,25 +378,25 @@ export function StartupProfile() {
                       </a>
                     )
                 )}
-
-                {startup.fundraising && (
-                  <div className="bg-white rounded-lg shadow-sm">
-                    <FundraisingCard
-                      startupId={startup.id}
-                      goal={startup.fundraising.goal}
-                      raised={startup.fundraising.raised}
-                      backers={startup.fundraising.backers}
-                      daysLeft={Math.ceil(
-                        (new Date(startup.fundraising.endDate).getTime() -
-                          new Date().getTime()) /
-                          (1000 * 60 * 60 * 24)
-                      )}
-                      description={startup.fundraising.description}
-                    />
-                  </div>
-                )}
               </div>
             </div>
+
+            {startup.fundraising && (
+              <div className="bg-white rounded-lg shadow-sm">
+                <FundraisingCard
+                  startupId={startup.id}
+                  goal={startup.fundraising.goal}
+                  raised={startup.fundraising.raised}
+                  backers={startup.fundraising.backers}
+                  daysLeft={Math.ceil(
+                    (new Date(startup.fundraising.endDate).getTime() -
+                      new Date().getTime()) /
+                      (1000 * 60 * 60 * 24)
+                  )}
+                  description={startup.fundraising.description}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
