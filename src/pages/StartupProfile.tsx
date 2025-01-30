@@ -11,6 +11,10 @@ import { TeamSection } from "../components/startup/team/TeamSection";
 import { DocumentSection } from "../components/startup/documents/DocumentSection";
 import { Button } from "../components/ui/Button";
 import { FundraisingCard } from "../components/startup/fundraising/FundraisingCard";
+import { Plus } from 'lucide-react';
+import { AddTeamMemberModal } from '../components/startup/modals/AddTeamMemberModal';
+import { AddUpdateModal } from '../components/startup/modals/AddUpdateModal';
+import { AddInvestmentModal } from '../components/startup/modals/AddInvestmentModal';
 
 interface Startup {
   id: string;
@@ -34,18 +38,30 @@ interface Startup {
     id: string;
     name: string;
     role: string;
-    avatar?: string;
+    image?: string;
+    linkedin?: string;
   }>;
   updates: Array<{
     id: string;
-    date: string;
+    title: string;
     content: string;
+    type: 'milestone' | 'news' | 'product' | 'team' | 'funding';
+    imageUrl?: string;
+    date: string;
   }>;
   investments: Array<{
     id: string;
-    investor: string;
+    investorName: string;
     amount: number;
     date: string;
+    investorLogo?: string;
+    testimonial?: string;
+    portfolio?: Array<{
+      name: string;
+      description: string;
+      logo?: string;
+      exitValue?: number;
+    }>;
   }>;
   socialLinks: Record<string, string>;
   fundraising: {
@@ -81,6 +97,10 @@ console.log(startup)
   const isAdmin = loggedInUser?.isAdmin;
   const canEdit = isOwner || isAdmin;
 
+  // Add these states after your existing states
+const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+const [isInvestmentModalOpen, setIsInvestmentModalOpen] = useState(false);
   useEffect(() => {
     fetchStartupDetails();
   }, [id]);
@@ -125,7 +145,44 @@ console.log(startup)
       console.error('Failed to fetch startup details:', error);
     }
   };
-
+  const handleAddTeamMember = async (memberData: any) => {
+    try {
+      await execute({
+        method: 'PUT',
+        url: `/api/applications/${id}/team-members`,
+        data: memberData
+      });
+      await fetchStartupDetails();
+    } catch (error) {
+      console.error('Failed to add team member:', error);
+    }
+  };
+  
+  const handleAddUpdate = async (updateData: any) => {
+    try {
+      await execute({
+        method: 'PUT',
+        url: `/api/applications/${id}/updates`,
+        data: updateData
+      });
+      await fetchStartupDetails();
+    } catch (error) {
+      console.error('Failed to add update:', error);
+    }
+  };
+  
+  const handleAddInvestment = async (investmentData: any) => {
+    try {
+      await execute({
+        method: 'PUT',
+        url: `/api/applications/${id}/investments`,
+        data: investmentData
+      });
+      await fetchStartupDetails();
+    } catch (error) {
+      console.error('Failed to add investment:', error);
+    }
+  };
   const handleSave = async (updatedData: any) => {
     try {
       await execute({
@@ -294,20 +351,82 @@ console.log(startup)
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold mb-6">Team</h2>
-              <TeamSection members={startup.teamMembers || []} />
-            </div>
+           {/* Team Section */}
+<div className="bg-white rounded-lg shadow-sm p-6">
+  <div className="flex justify-between items-center mb-6">
+    <h2 className="text-xl font-semibold">Team</h2>
+    {canEdit && (
+      <Button
+        onClick={() => setIsTeamModalOpen(true)}
+        variant="outline"
+        className="flex items-center space-x-2"
+      >
+        <Plus className="w-4 h-4" />
+        <span>Add Team Member</span>
+      </Button>
+    )}
+  </div>
+  <TeamSection members={startup.teamMembers || []} />
+</div>
 
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold mb-6">Updates & Milestones</h2>
-              <StartupUpdates updates={startup.updates} />
-            </div>
+{/* Updates Section */}
+<div className="bg-white rounded-lg shadow-sm p-6">
+  <div className="flex justify-between items-center mb-6">
+    <h2 className="text-xl font-semibold">Updates & Milestones</h2>
+    {canEdit && (
+      <Button
+        onClick={() => setIsUpdateModalOpen(true)}
+        variant="outline"
+        className="flex items-center space-x-2"
+      >
+        <Plus className="w-4 h-4" />
+        <span>Add Update</span>
+      </Button>
+    )}
+  </div>
+  <StartupUpdates updates={startup.updates} />
+</div>
 
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold mb-6">Investment History</h2>
-              <InvestorShowcase investments={startup.investments} />
-            </div>
+{/* Investment Section */}
+<div className="bg-white rounded-lg shadow-sm p-6">
+  <div className="flex justify-between items-center mb-6">
+    <h2 className="text-xl font-semibold">Investment History</h2>
+    {canEdit && (
+      <Button
+        onClick={() => setIsInvestmentModalOpen(true)}
+        variant="outline"
+        className="flex items-center space-x-2"
+      >
+        <Plus className="w-4 h-4" />
+        <span>Add Investment</span>
+      </Button>
+    )}
+  </div>
+  <InvestorShowcase investments={startup.investments} />
+</div>
+
+{/* Add modals at the bottom of your return statement */}
+{canEdit && (
+  <>
+    <AddTeamMemberModal
+      isOpen={isTeamModalOpen}
+      onClose={() => setIsTeamModalOpen(false)}
+      onSave={handleAddTeamMember}
+    />
+    
+    <AddUpdateModal
+      isOpen={isUpdateModalOpen}
+      onClose={() => setIsUpdateModalOpen(false)}
+      onSave={handleAddUpdate}
+    />
+    
+    <AddInvestmentModal
+      isOpen={isInvestmentModalOpen}
+      onClose={() => setIsInvestmentModalOpen(false)}
+      onSave={handleAddInvestment}
+    />
+  </>
+)}
           </div>
 
           <div className="space-y-6">
